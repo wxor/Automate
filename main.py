@@ -1,122 +1,130 @@
 import subprocess
 import re
+import os
 import sys
 import argparse
+from httpenum import httpstart
+from findall import startfind
 
-activeip = []
-
-#Search Function
-def find_all(sub, string):
-	start = 0
-	while True:
-		start = string.find(sub, start)
-		if start == -1: return
-		yield start
-		start += len(sub)
-		
-#First scan (Top 1000 ports only)
-def nmapscan1 (machineaddr):
-	output = subprocess.run(['nmap','-T4',machineaddr,'-v'], check=True, stdout=subprocess.PIPE, universal_newlines=True)
-	#print(output.stdout)
-	
-	startpos = (list(find_all("open port", output.stdout)))
-
-	#Extract Active Ports
-	port = ""
-	for i in range(len(startpos)):
-		val = startpos[i] + 9
-		while output.stdout[val] != "/":
-			val=val+1
-
-		endpos = val
-		adjstartpos = startpos[i] + 9
-		while adjstartpos != endpos:
-			port = port+output.stdout[adjstartpos]
-			adjstartpos = adjstartpos + 1
-
-	#Split ports in string into list
-	activeports = []
-	for line in port.split(" "):
-	    if not line.strip():
-		    continue
-	    activeports.append(line.lstrip())
-	
-	activeports.insert(0,machineaddr)
-	return activeports
-
-#Second scan (All ports)
-def nmapscan2 (machineaddr):
-	output = subprocess.run(['nmap','-T4','-p-',machineaddr,'-v'], check=True, stdout=subprocess.PIPE, universal_newlines=True)
-	print(output.stdout)
-	
-	startpos = (list(find_all("open port", output.stdout)))
-
-	#Extract Active Ports
-	port = ""
-	for i in range(len(startpos)):
-		val = startpos[i] + 9
-		while output.stdout[val] != "/":
-			val=val+1
-
-		endpos = val
-		adjstartpos = startpos[i] + 9
-		while adjstartpos != endpos:
-			port = port+output.stdout[adjstartpos]
-			adjstartpos = adjstartpos + 1
-
-	#Split ports in string into list
-	activeports = []
-	for line in port.split(" "):
-	    if not line.strip():
-		    continue
-	    activeports.append(line.lstrip())
-	
-	activeports.insert(0,machineaddr)
-	return activeports
-
-#Third scan (Default Scripts, Version, OS Enum)
-def nmapscan3 (activeports):
-	for i in range(len(activeports)-1):
-		output = subprocess.run(['nmap','-A','-T4','-p', activeports[i+1], activeports[0],'-v'], check=True, stdout=subprocess.PIPE, universal_newlines=True)
-		print(output.stdout)
-	
-#Get Active Machines
-def getactive(subnet):
-	output = subprocess.run(['nmap','-T4','-sn',subnet,'-v'], check=True, stdout=subprocess.PIPE, universal_newlines=True)
-	#Search String "Host is up"
-	endpos = (list(find_all("Host is up", output.stdout)))
-
-	#Extract Active IP Addresses
-	ip = ""
-	for i in range(len(endpos)):
-		val = endpos[i] - 2
-		while str.isspace(output.stdout[val]) is False:
-			val=val-1
-
-		startpos = val
-		while startpos != endpos[i]:
-			ip = ip+output.stdout[startpos]
-			startpos = startpos+1
-
-	#Split IP Addresses in string into list
-	for line in ip.split("\n"):
-	    if not line.strip():
-		    continue
-	    activeip.append(line.lstrip())
+from getactive import startactive
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-ip", help="Specify a single host or with CIDR notation")
-args = parser.parse_args()
-if args.ip:
-	print("Starting scan on ", args.ip)
-	getactive(args.ip)
 
-#Add null checks and validate ip address later
-for i in range(len(activeip)):
-	print('STARTING BASIC SCAN ON: ',activeip[i])
-	portlist = nmapscan1(activeip[i])
-	#print('STARTING FULL PORT SCAN ON: ',activeip[i])
-	#portlist = nmapscan2(activeip[i])
-	print('STARTING PORT ENUM SCAN ON: ',activeip[i])
-	print(nmapscan3(portlist))
+# First scan (Top 1000 ports only)
+def nmapscan1(machineaddr):
+    output = subprocess.run(['nmap', '-T4', machineaddr, '-v'], check=True, stdout=subprocess.PIPE,
+                            universal_newlines=True)
+    filename = str(machineaddr+'-Top1000'+'.txt')
+    print(filename)
+    with open(filename, 'w') as f:
+        print(output.stdout, file=f)
+
+    startpos = (list(startfind("open port", output.stdout)))
+
+    # Extract Active Ports
+    port = ""
+    for i in range(len(startpos)):
+        val = startpos[i] + 9
+        while output.stdout[val] != "/":
+            val = val + 1
+
+        endpos = val
+        adjstartpos = startpos[i] + 9
+        while adjstartpos != endpos:
+            port = port + output.stdout[adjstartpos]
+            adjstartpos = adjstartpos + 1
+
+    # Split ports in string into list
+    activeports = []
+    for line in port.split(" "):
+        if not line.strip():
+            continue
+        activeports.append(line.lstrip())
+
+    activeports.insert(0, machineaddr)
+    return activeports
+
+
+# Second scan (All ports)
+def nmapscan2(machineaddr):
+    output = subprocess.run(['nmap', '-T4', '-p-', machineaddr, '-v'], check=True, stdout=subprocess.PIPE,
+                            universal_newlines=True)
+    filename = str(machineaddr+'-AllPorts'+'.txt')
+    print(filename)
+    with open(filename, 'w') as f:
+        print(output.stdout, file=f)
+
+    startpos = (list(startfind("open port", output.stdout)))
+
+    # Extract Active Ports
+    port = ""
+    for i in range(len(startpos)):
+        val = startpos[i] + 9
+        while output.stdout[val] != "/":
+            val = val + 1
+
+        endpos = val
+        adjstartpos = startpos[i] + 9
+        while adjstartpos != endpos:
+            port = port + output.stdout[adjstartpos]
+            adjstartpos = adjstartpos + 1
+
+    # Split ports in string into list
+    activeports = []
+    for line in port.split(" "):
+        if not line.strip():
+            continue
+        activeports.append(line.lstrip())
+
+    activeports.insert(0, machineaddr)
+    return activeports
+
+
+# Third scan (Default Scripts, Version, OS Enum)
+def nmapscan3(activeports):
+    for i in range(len(activeports) - 1):
+        cmd = 'nmap -A -T4 --script=banner -v -p'+activeports[i+1]+" "+activeports[0]
+        print(cmd)
+        output = subprocess.run(cmd, check=True, shell=True, stdout=subprocess.PIPE, universal_newlines=True)
+        #output = subprocess.run(['nmap', '-A', '-T4', script, '-p', activeports[i+1], activeports[0], '-v'], check=True,
+        #                        stdout=subprocess.PIPE, universal_newlines=True)
+
+        filename = str(activeports[0])+'-EnumPort-'+str(activeports[i+1])+'.txt'
+        print(filename)
+        with open(filename, 'w') as f:
+            print(output.stdout, file=f)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-ip", help="Specify a single host or with CIDR notation")
+    parser.add_argument("-o", help="Specify output folder")
+    args = parser.parse_args()
+    if args.ip:
+        activehosts = startactive(args.ip)
+    if args.o:
+        path = args.o
+    else:
+        path = os.getcwd()
+
+    # Add null checks and validate ip address later
+    for i in range(len(activehosts)):
+        #create dir structure
+        path = path+'/'+activehosts[i]
+        try:
+            os.mkdir(path)
+        except OSError:
+            print("Creation of the directory %s failed" % path)
+        else:
+            print("Successfully created the directory %s " % path)
+
+
+
+        print('STARTING BASIC SCAN ON: ', activehosts[i])
+        portlist = nmapscan1(activehosts[i])
+        print('STARTING FULL PORT SCAN ON: ', activehosts[i])
+        portlist = nmapscan2(activehosts[i])
+        print('STARTING PORT ENUM SCAN ON: ', activehosts[i])
+        print(nmapscan3(portlist))
+
+    httpports = httpstart('192.168.29.204')
+    print(httpports)
